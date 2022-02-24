@@ -141,11 +141,6 @@ int main(void)
 		int button2 = !pio_get(BUT2_PIO, BUT2_PIO_ID, BUT2_PIO_IDX_MASK);
 		int button3 = !pio_get(BUT3_PIO, BUT3_PIO_ID, BUT3_PIO_IDX_MASK);
 		
-		pio_set(LED_PIO, LED_PIO_IDX_MASK);
-		pio_set(LED1_PIO, LED1_PIO_IDX_MASK);
-		pio_set(LED2_PIO, LED2_PIO_IDX_MASK);
-		pio_set(LED3_PIO_IDX_MASK, LED3_PIO_IDX_MASK);
-		
 		if (button) {
 		// coloca 1 no pino do LED.
 			int i = 0;
@@ -160,23 +155,24 @@ int main(void)
 		// coloca 1 no pino do LED.
 		
 			pio_clear(LED1_PIO, LED1_PIO_IDX_MASK);
-			delay_ms(500);
-			pio_set(LED1_PIO, LED1_PIO_IDX_MASK);
 		}
 		if (button2) {
 			// coloca 1 no pino do LED.
 			
 			pio_clear(LED2_PIO, LED2_PIO_IDX_MASK);
-			delay_ms(500);
-			pio_set(LED2_PIO, LED2_PIO_IDX_MASK);
 		}
 		if (button3) {
 			// coloca 1 no pino do LED.
 			
 			pio_clear(LED3_PIO, LED3_PIO_IDX_MASK);
-			delay_ms(500);
-			pio_set(LED3_PIO, LED3_PIO_IDX_MASK);
 		}
+		delay_ms(200);
+		pio_set(LED_PIO, LED_PIO_IDX_MASK);
+		pio_set(LED1_PIO, LED1_PIO_IDX_MASK);
+		pio_set(LED2_PIO, LED2_PIO_IDX_MASK);
+		pio_set(LED3_PIO, LED3_PIO_IDX_MASK);
+		
+		
   }
   return 0;
 }
