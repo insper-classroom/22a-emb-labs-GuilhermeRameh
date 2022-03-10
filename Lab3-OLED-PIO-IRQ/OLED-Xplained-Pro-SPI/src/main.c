@@ -111,6 +111,7 @@ void but3_callback(void)
 		} else if (pio_get(BUT3_PIO, PIO_INPUT, BUT3_PIO_IDX_MASK) && timer<3000000 && timer!=0){
 			frequencia -= 1;
 			timer = 0;
+			but_flag = 1;
 			break;
 		}
 	}
