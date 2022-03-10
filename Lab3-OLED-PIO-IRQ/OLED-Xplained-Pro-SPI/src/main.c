@@ -83,10 +83,6 @@ void but_callback(void)
 			timer = 0;
 			but_flag = 1;
 			break;
-		} else if (pio_get(BUT2_PIO, PIO_INPUT, BUT2_PIO_IDX_MASK) && timer>3000000){
-			pio_clear(LED_PIO, LED_IDX_MASK);
-			stop_blink_flag = 1;
-			break;
 		}
 	}
 	update_display();
@@ -115,6 +111,7 @@ void but3_callback(void)
 			break;
 		}
 	}
+	update_display();
 }
 
 void update_display(void){
