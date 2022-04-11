@@ -31,94 +31,62 @@
 #define BUT3_PIO_IDX_MASK (1u << BUT3_PIO_IDX)
 
 
-void pisca_led(int n, int t);
 void but_callback(void);
-void but2_callback(void);
-void but3_callback(void);
-void init(void);
+void TC_init(Tc * TC, int ID_TC, int TC_CHANNEL, int freq);
 void update_display(void);
+void init(void);
 
 // Global var
-volatile but_flag = 0;
-volatile stop_blink_flag = 0;
-int timer = 0;
-int frequencia = 1;
+volatile send_signal_flag = 0;
+volatile receive_signal_flag = 0;
+
 char buffer [128];
 
 
-// FUNCOES	
-void pisca_led(int n, int freq){
-	double periodo = 1.0/freq;
-	double progress = 0;
-	double bar = 0;
-	int time_delay = periodo*1000;//não faz sentido quanto tempo ele demora
-	gfx_mono_generic_draw_rect(60, 8, 60, 16, 1);
-	for (int i=0;i<=30;i++){
-		if (stop_blink_flag){
-			stop_blink_flag = 0;
-			break;
-		}
-		progress = ((double)i/(30))*100;
-		bar = (double)(60.0/100)*progress;
-		gfx_mono_generic_draw_filled_rect(60, 8, bar, 16, 1);
-		pio_clear(LED2_PIO, LED2_PIO_IDX_MASK);
-		delay_ms(time_delay);
-		pio_set(LED2_PIO, LED2_PIO_IDX_MASK);
-		delay_ms(time_delay);
-	}
-}
-
+// FUNCOES
 void but_callback(void)
 {
-	for (int i=0; i<3500000; i++){
-		if (!pio_get(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK)) {
-			timer = i;
-		} else if (pio_get(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK) && timer>3000000){
-			frequencia -= 1;
-			timer = 0;
-			but_flag = 1;
-			break;
-		} else if (pio_get(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK) && timer<3000000 && timer!=0){
-			frequencia += 1;
-			timer = 0;
-			but_flag = 1;
-			break;
-		}
+	if (pio_get(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK)) {
+		send_signal_flag = 1;
 	}
-	update_display();
-}
-void but2_callback(void)
-{
-	for (int i=0; i<3500000; i++){
-		if (!pio_get(BUT2_PIO, PIO_INPUT, BUT2_PIO_IDX_MASK)) {
-			timer = i;
-		} else if (pio_get(BUT2_PIO, PIO_INPUT, BUT2_PIO_IDX_MASK) && timer>3000000){
-			stop_blink_flag = 1;
-			timer = 0;
-			break;
-		}
-	}
-}
-void but3_callback(void)
-{
-	for (int i=0; i<3500000; i++){
-		if (!pio_get(BUT3_PIO, PIO_INPUT, BUT3_PIO_IDX_MASK)) {
-			timer = i;
-		} else if (pio_get(BUT3_PIO, PIO_INPUT, BUT3_PIO_IDX_MASK) && timer<3000000 && timer!=0){
-			frequencia -= 1;
-			timer = 0;
-			but_flag = 1;
-			break;
-		}
-	}
-	update_display();
 }
 
-void update_display(void){
-	sprintf(buffer, "%dHz", frequencia);
-	gfx_mono_draw_string(buffer, 8,8, &sysfont);
-	gfx_mono_generic_draw_filled_rect(60,8,60,16,0);
+double calc_distancia(int t){
+	return (t*34000)/2;
 }
+
+//#####################################################
+// INIT FUNCTIONS
+void TC_init(Tc * TC, int ID_TC, int TC_CHANNEL, int freq){
+	uint32_t ul_div;
+	uint32_t ul_tcclks;
+	uint32_t ul_sysclk = sysclk_get_cpu_hz();
+
+	/* Configura o PMC */
+	pmc_enable_periph_clk(ID_TC);
+
+	/** Configura o TC para operar em  freq hz e interrupçcão no RC compare */
+	tc_find_mck_divisor(freq, ul_sysclk, &ul_div, &ul_tcclks, ul_sysclk);
+	tc_init(TC, TC_CHANNEL, ul_tcclks | TC_CMR_CPCTRG);
+	tc_write_rc(TC, TC_CHANNEL, (ul_sysclk / ul_div) / freq);
+
+	/* Configura NVIC*/
+	NVIC_SetPriority(ID_TC, 4);
+	NVIC_EnableIRQ((IRQn_Type) ID_TC);
+	tc_enable_interrupt(TC, TC_CHANNEL, TC_IER_CPCS);
+}
+
+void TC1_Handler(void) {
+	volatile uint32_t status = tc_get_status(TC0, 1);
+	
+	if(pio_get_output_data_status(LED_PIO, LED_IDX_MASK)){
+		pio_clear(LED_PIO, LED_IDX_MASK);
+	}
+	else{
+		pio_set(LED_PIO,LED_IDX_MASK);
+	}
+}
+
 
 void init(void){
 	// Initialize the board clock
@@ -137,8 +105,6 @@ void init(void){
 	// Ativa o PIO na qual o LED foi conectado
 	// para que possamos controlar o LED.
 	pmc_enable_periph_clk(BUT1_PIO_ID);
-	pmc_enable_periph_clk(BUT2_PIO_ID);
-	pmc_enable_periph_clk(BUT3_PIO_ID);
 	pmc_enable_periph_clk(LED2_PIO_ID);
 	
 	//Inicializa PC8 como saída
@@ -161,18 +127,7 @@ void init(void){
 	BUT1_PIO_IDX_MASK,
 	PIO_IT_EDGE,
 	but_callback);
-	
-	pio_handler_set(BUT2_PIO,
-	BUT2_PIO_ID,
-	BUT2_PIO_IDX_MASK,
-	PIO_IT_EDGE,
-	but2_callback);
-	
-	pio_handler_set(BUT3_PIO,
-	BUT3_PIO_ID,
-	BUT3_PIO_IDX_MASK,
-	PIO_IT_EDGE,
-	but3_callback);
+
 	
 	// Ativa interrupção e limpa primeira IRQ gerada na ativacao
 	pio_enable_interrupt(BUT1_PIO, BUT1_PIO_IDX_MASK);
@@ -182,39 +137,32 @@ void init(void){
 	pio_enable_interrupt(BUT2_PIO, BUT2_PIO_IDX_MASK);
 	pio_get_interrupt_status(BUT2_PIO);
 	
-	// Ativa interrupção e limpa primeira IRQ gerada na ativacao
-	pio_enable_interrupt(BUT3_PIO, BUT3_PIO_IDX_MASK);
-	pio_get_interrupt_status(BUT3_PIO);
-	
 	// Configura NVIC para receber interrupcoes do PIO do botao
 	// com prioridade 4 (quanto mais próximo de 0 maior)
 	NVIC_EnableIRQ(BUT1_PIO_ID);
 	NVIC_SetPriority(BUT1_PIO_ID, 4); // Prioridade 4
-	
 	// Configura NVIC para receber interrupcoes do PIO do botao
 	// com prioridade 4 (quanto mais próximo de 0 maior)
 	NVIC_EnableIRQ(BUT2_PIO_ID);
 	NVIC_SetPriority(BUT2_PIO_ID, 4); // Prioridade 4
-	
-	// Configura NVIC para receber interrupcoes do PIO do botao
-	// com prioridade 4 (quanto mais próximo de 0 maior)
-	NVIC_EnableIRQ(BUT3_PIO_ID);
-	NVIC_SetPriority(BUT3_PIO_ID, 4); // Prioridade 4
 }
 
 
 int main (void)
 {
-	init();	
+	init();
 	
-  /* Insert application code here, after the board has been initialized. */
+	/* Insert application code here, after the board has been initialized. */
 	while(1) {
-		update_display();
-		if (but_flag){
-			pisca_led(4, frequencia);
-			but_flag = 0;
+		if (send_signal_flag){
+			TC_init(TC0, ID_TC1, 1, 4);
+			tc_start(TC0, 1);
+			send_signal_flag = 0;
+		}
+		if (receive_signal_flag){
+			double distancia = calc_distancia(2);
 		}
 		// Entra em sleep mode
-		pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
+		//pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
 	}
 }
